@@ -1,7 +1,5 @@
 import logging
-from bisect import bisect_left
 import math
-import functools
 
 class funcTable:
     def __init__(self, x:float, y:float, dy:float) -> None:
@@ -13,6 +11,9 @@ class funcTable:
 class interFunc:
     table = []
     diffs = []
+
+    ermit_table = []
+    ermit_diffs = []
 
     def __init__(self, polynom_size:int):
         self.polynom_size = polynom_size
@@ -32,32 +33,45 @@ class interFunc:
 
         return self.table
 
-
-    def set_table_slice(self, x:float) -> list[funcTable]:
+    def set_table_slice(self, x:float) -> list:
         num_of_records = self.polynom_size + 1
 
         for ind, rec in enumerate(self.table):
             if rec.x >= x:
                 logging.debug(f"Index of {ind}\tnum of records {num_of_records}")
-                num_of_records /= 2
-                num_of_records = math.ceil(num_of_records)
+                half = num_of_records / 2
+                half = math.ceil(half)
 
-                while ind > 0 and num_of_records > 0:
-                    ind -= 1
-                    num_of_records -= 1
+                indent = num_of_records
+
+                while ind < len(self.table) and half > 0:
+                    half -= 1
+                    ind += 1
+
+                ind -= indent
+
+                if (ind < 0):
+                    ind = 0
+
                 
                 logging.debug(f"Index of {ind}\tnum of records {num_of_records}")
                 self.table = self.table[ind:ind + self.polynom_size + 1]
 
-                self.__set_diffs()        
+
+                self.__set_diffs()
+                self.__double_table()
+                self.__set_ermit_diffs()      
                 return self.table
         
-        self.table = self.table[len(self.table) - 2 - self.polynom_size:len(self.table)]
+        self.table = self.table[len(self.table) - 1 - self.polynom_size:len(self.table)]
 
         self.__set_diffs()
+        self.__double_table()
+        self.__set_ermit_diffs()
+
         return self.table
 
-    def get_sep_diff(self, vals:list[int]) -> float:
+    def get_sep_diff(self, vals:tuple) -> float:
         if len(vals) == 2:
             return (self.table[vals[0]].y - self.table[vals[1]].y) / (self.table[vals[0]].x - self.table[vals[1]].x)
 
@@ -87,6 +101,44 @@ class interFunc:
         self.diffs = []
 
         for i in range(self.polynom_size):
-            self.diffs.append(self.get_sep_diff(ind))
+            self.diffs.append(self.get_sep_diff(tuple(ind)))
             ind.append(i + 2)
+    
 
+    # ------------ ERMIT ------------
+
+    def get_ermit_sep_diff(self, vals:tuple) -> float:
+        if len(vals) == 2:
+            if (self.ermit_table[vals[0]].x == self.ermit_table[vals[1]].x): # (x_0, x_0)
+                return self.ermit_table[vals[0]].dy 
+            return (self.ermit_table[vals[0]].y - self.ermit_table[vals[1]].y) / (self.ermit_table[vals[0]].x - self.ermit_table[vals[1]].x)
+
+        return (self.get_ermit_sep_diff(vals[0:len(vals) - 1]) - self.get_ermit_sep_diff(vals[1:len(vals)])) / (self.ermit_table[vals[0]].x - self.ermit_table[vals[-1]].x)
+
+    def __double_table(self):
+        for record in self.table:
+            self.ermit_table.append(record)
+            self.ermit_table.append(record)
+    
+    def __set_ermit_diffs(self):
+        ind = [0, 1]
+        self.ermit_diffs = []
+
+        for i in range(self.polynom_size):
+            self.ermit_diffs.append(self.get_ermit_sep_diff(tuple(ind)))
+            ind.append(i + 2)
+    
+    
+    def ermit_polynom(self, x:float):
+        y_z = self.ermit_table[0].y
+
+        for i in range(self.polynom_size):
+            val = self.ermit_diffs[i]
+
+            for j in range(i + 1):
+                val *= (x - self.ermit_table[j].x)
+            y_z += val
+
+        return y_z
+
+    
