@@ -27,23 +27,34 @@ end
 local function main()
     print("======================= Lab 04 =======================")
 
-    local input_file = "../../data/test.csv"
-    local read_table = table_io.Read_table_from_file(input_file)
-
-    menu(read_table)
-
-    table_io.Dump(read_table, input_file)
-
-    io.write("Input poly degree: ")
-    local power = io.read("*number")
-
-    local result = approx.GetMiddleFunc(read_table, power)
-
+    local input_file_with_weights    = "../../data/test.csv"
+    local input_file_without_weights = "../../data/test_weightless.csv"
+    
+    -- menu(read_table)
+    
+    -- table_io.Dump(read_table, input_file_with_weights)
+    
+    -- io.write("Input poly degree: ")
+    -- local power = io.read("*number")
+    
+    
     local fout = io.open("../../data/output.csv", "w")
+    
+    local read_table = table_io.Read_table_from_file(input_file_without_weights)
+    
+    local result = approx.GetMiddleFunc(read_table, 1)
+    fout:write(table.concat(result, ", "), '\n')
 
-    fout:write(table.concat(result, ", "))
+    result = approx.GetMiddleFunc(read_table, 2)
+    fout:write(table.concat(result, ", "), '\n')
 
-    print("Result: " .. table.concat(result, ", "))
+    read_table = table_io.Read_table_from_file(input_file_with_weights)
+    
+    result = approx.GetMiddleFunc(read_table, 1)
+    fout:write(table.concat(result, ", "), '\n')
+
+    result = approx.GetMiddleFunc(read_table, 2)
+    fout:write(table.concat(result, ", "), '\n')
 
     fout:close()
 end

@@ -1,12 +1,16 @@
 import matplotlib.pyplot as plt
 
-def read_vector_from_file(filename):
-    vec = []
+def read_poly_from_file(filename):
+    poly_coeffs = []
     with open(filename, 'r') as f:
-        line = f.readline().split(",")
-        vec.extend(list(map(float, line)))
+        for i in f:
+            line = i.split(",")
+            
+            poly = list(map(float, line))
+
+            poly_coeffs.append(poly)
     
-    return vec
+    return poly_coeffs
 
 def read_table_from_file(filename):
     table = []
@@ -40,7 +44,7 @@ def main():
     fig = plt.figure()
     
     table = read_table_from_file('../data/test.csv')
-    coeffs = read_vector_from_file("../data/output.csv")
+    coeffs = read_poly_from_file("../data/output.csv")
 
     left = table[0][0]
     right = table[0][0]
@@ -53,10 +57,19 @@ def main():
         plt.text(i[0], i[1], f'{i[2]}')
     
 
-    x, y = interval(left - 1, right + 2, coeffs)
 
-    plt.plot(x, y)
-    
+    x_1, y_1 = interval(left - 1, right + 2, coeffs[0])
+    x_2, y_2 = interval(left - 1, right + 2, coeffs[1])
+    x_3, y_3 = interval(left - 1, right + 2, coeffs[2])
+    x_4, y_4 = interval(left - 1, right + 2, coeffs[3])
+
+    plt.plot(x_1, y_1, label='1 степень (вес одинаковый)')
+    plt.plot(x_2, y_2, label='2 степень (вес одинаковый)')
+    plt.plot(x_3, y_3, label='1 степень (вес разный)', linestyle='dashed')
+    plt.plot(x_4, y_4, label='2 степень (вес разный)', linestyle='dashed')
+
+    plt.legend()
+    plt.grid()
 
     plt.show()
 
