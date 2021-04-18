@@ -34,26 +34,6 @@ function approx.Read_table(filename)
    return func_table
 end
 
-function approx.MakeCMatrix(main_table)
-    local matrix = { }
-
-    local h = function (i)
-        return main_table[i].x - main_table[i - 1].x
-    end
-
-    for i = 3, #main_table do
-        local row = { 
-            h(i - 1),
-            2 * (h(i - 1) + h(i)),
-            h(i),
-            3 * (((main_table[i].y - main_table[i - 1].y) / h(i)) - ((main_table[i - 1].y - main_table[i - 2].y) / h(i))) }
-
-        table.insert(matrix, row)
-    end
-
-    return matrix
-end
-
 local function get_e_n(main_table)
     local h = function (i)
         return main_table[i].x - main_table[i - 1].x
@@ -63,29 +43,35 @@ local function get_e_n(main_table)
         return 3 * ( (main_table[i].y - main_table[i - 1].y) / h(i) - (main_table[i - 1].y - main_table[i - 2].y) / h(i - 1))
     end
 
-    local e_table = { 0, 0 }
-    local n_table = { 0, 0 }
+    local e_table = { 0 }
+    local n_table = { 0 }
+
+    local j = 2
 
     for i = 3, #main_table do
-        local curr_e = - (h(i) / (h(i - 1) * e_table[i - 1] + 2 * (h(i - 1) + h(i))))
-        local curr_n = (f(i) - h(i - 1) * n_table[i - 1]) / (h(i - 1) * e_table[i - 1] + 2 * (h(i - 1) + h(i)))
+        local curr_e = - (h(i) / (h(i - 1) * e_table[j - 1] + 2 * (h(i - 1) + h(i))))
+        local curr_n = (f(i) - h(i - 1) * n_table[j - 1]) / (h(i - 1) * e_table[j - 1] + 2 * (h(i - 1) + h(i)))
 
         table.insert(e_table, curr_e)
         table.insert(n_table, curr_n)
+
+        j = j + 1
     end
+
+    table.insert(e_table, 0)
+    table.insert(n_table, 0)
 
     return e_table, n_table
 end
 
 function approx.SolveCMatrix(main_table)
     local e_table, n_table = get_e_n(main_table)
-
+    
     local c_table = { }
-    c_table[#main_table + 1] = 0
+    c_table[#main_table] = 0
 
-    for i = #main_table, 1, -1 do
-        local curr_c = e_table[i] * c_table[i + 1] + n_table[i]
-
+    for i = #main_table - 1, 1, -1 do
+        local curr_c = e_table[i + 1] * c_table[i + 1] + n_table[i + 1]
         c_table[i] = curr_c
     end
 
@@ -101,14 +87,32 @@ local function get_else_coeffs(main_table, c_table)
         return main_table[i + 1].x - main_table[i].x
     end
 
-    for i = 1, #main_table - 1 do
-        a[i] = main_table[i].y
-        b[i] = (main_table[i + 1].y - main_table[i].y) / h(i) - h(i) * (c_table[i + 2] - 2 * c_table[i + 1])
+    local j = 1
+
+    for i = 2, #main_table - 1 do
+        a[j] = main_table[j].y
+        b[j] = (main_table[j + 1].y - main_table[j].y) / h(j) - h(j) * (c_table[j + 2] - 2 * c_table[j + 1])
+        d[j] = (c_table[j + 2] - c_table[j + 1]) / (3 * h(j + 1))
+
+        j = j + 1
     end
+
+    table.insert(a, main_table[#main_table - 1].y)
+    table.insert(b, (((main_table[#main_table].y - main_table[#main_table - 1].y) / h(#main_table - 1)) - h(#main_table - 1) * 2 * c_table[#c_table - 1] / 3))
+    table.insert(d, -c_table[#c_table] / (3 * h(#main_table - 1)))
+
+    return a, b, c_table, d
 end
 
 function approx.Spline(table)
-    get_else_coeffs()
+    local C = approx.SolveCMatrix(table)
+    local a, b, c, d = get_else_coeffs(table, C)
+
+    for i = 1, #a do
+        print(a[i], b[i], c[i], d[i])
+    end
+
+    return a, b, c, d
 end
 
 return approx
