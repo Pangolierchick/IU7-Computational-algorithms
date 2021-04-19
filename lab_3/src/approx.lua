@@ -1,9 +1,22 @@
 local matrix = require 'lib.matrix'
 
-local approx = {}
+local approx = {
+    func_table = nil,
+    splines = {"a", "b", "c", "d"},
+}
+
+approx.__index = approx
+
+function approx.New(filename)
+    local self = setmetatable({}, approx)
+
+    self.func_table = self:Read_table(filename)
+
+    return self
+end
 
 -- a + bx + cx^2 + dx^3 ...
-function approx.Cubic_poly(x, ...)
+function approx:Cubic_poly(x, ...)
     local res = 0
     local arg = {...}
 
@@ -18,8 +31,8 @@ function approx.Cubic_poly(x, ...)
     return res
 end
 
-function approx.Read_table(filename)
-    local f <close> = io.open(filename, "r")
+function approx:Read_table(filename)
+    local f = io.open(filename, "r")
 
     local func_table = {}
 
@@ -29,90 +42,100 @@ function approx.Read_table(filename)
         row.x, row.y = line:match('(%w+.%w+), (%w+.%w+)')
 
         table.insert(func_table, row)
-   end
+    end
 
-   return func_table
+    self.func_table = func_table
+
+    f:close()
+
+    return func_table
 end
 
-local function get_e_n(main_table)
-    local h = function (i)
-        return main_table[i].x - main_table[i - 1].x
+function approx:Nearest(x)
+    local x_min = math.abs(self.func_table[1].x - x)
+    local ind = 1
+
+    for i = 2, #self.func_table do
+        if x_min > math.abs(self.func_table[i].x - x) then
+            ind = i
+            x_min = math.abs(self.func_table[i].x - x)
+        end
     end
 
-    local f = function (i)
-        return 3 * ( (main_table[i].y - main_table[i - 1].y) / h(i) - (main_table[i - 1].y - main_table[i - 2].y) / h(i - 1))
-    end
-
-    local e_table = { 0 }
-    local n_table = { 0 }
-
-    local j = 2
-
-    for i = 3, #main_table do
-        local curr_e = - (h(i) / (h(i - 1) * e_table[j - 1] + 2 * (h(i - 1) + h(i))))
-        local curr_n = (f(i) - h(i - 1) * n_table[j - 1]) / (h(i - 1) * e_table[j - 1] + 2 * (h(i - 1) + h(i)))
-
-        table.insert(e_table, curr_e)
-        table.insert(n_table, curr_n)
-
-        j = j + 1
-    end
-
-    table.insert(e_table, 0)
-    table.insert(n_table, 0)
-
-    return e_table, n_table
+    return ind
 end
 
-function approx.SolveCMatrix(main_table)
-    local e_table, n_table = get_e_n(main_table)
-    
-    local c_table = { }
-    c_table[#main_table] = 0
+function approx:GetSplines()
+    local h = { 0 }
 
-    for i = #main_table - 1, 1, -1 do
-        local curr_c = e_table[i + 1] * c_table[i + 1] + n_table[i + 1]
-        c_table[i] = curr_c
+    local tmp_a = { 0 }
+    local tmp_b = { 0 }
+    local tmp_d = { 0 }
+    local f     = { 0 }
+
+    local y = function (i)
+        return self.func_table[i].y
     end
 
-    return c_table
-end
+    local xi   = { 0, 0, 0 }
+    local etha = { 0, 0, 0 }
 
-local function get_else_coeffs(main_table, c_table)
-    local a = {}
-    local b = {}
-    local d = {}
+    for i = 2, #self.func_table do
+        table.insert(h, self.func_table[i].x - self.func_table[i - 1].x)
+        if i < 3 then
+            table.insert(tmp_a, 0)
+            table.insert(tmp_b, 0)
+            table.insert(tmp_d, 0)
+            table.insert(f, 0)
+        else
+            table.insert(tmp_a, h[i - 1])
+            table.insert(tmp_b, -2 * (h[i - 1] + h[i]))
+            table.insert(tmp_d, h[i])
+            table.insert(f, -3 * ((y(i) - y(i - 1)) / h[i] - (y(i - 1) - y(i - 2)) / h[i - 1]))
 
-    local h = function (i)
-        return main_table[i + 1].x - main_table[i].x
+            xi[i + 1]   = tmp_d[i] / (tmp_b[i] - tmp_a[i] * xi[i])
+            etha[i + 1] = (tmp_a[i] * etha[i] + f[i]) / (tmp_b[i] - tmp_a[i] * xi[i])
+        end
+
     end
 
-    local j = 1
+    local c = {}
+    c[#self.func_table + 1] = 0
+    c[#self.func_table] = 0
 
-    for i = 2, #main_table - 1 do
-        a[j] = main_table[j].y
-        b[j] = (main_table[j + 1].y - main_table[j].y) / h(j) - h(j) * (c_table[j + 2] - 2 * c_table[j + 1])
-        d[j] = (c_table[j + 2] - c_table[j + 1]) / (3 * h(j + 1))
-
-        j = j + 1
+    for i = #self.func_table - 1, 1, -1 do
+        c[i] = xi[i + 1] * c[i + 1] + etha[i + 1]
     end
 
-    table.insert(a, main_table[#main_table - 1].y)
-    table.insert(b, (((main_table[#main_table].y - main_table[#main_table - 1].y) / h(#main_table - 1)) - h(#main_table - 1) * 2 * c_table[#c_table - 1] / 3))
-    table.insert(d, -c_table[#c_table] / (3 * h(#main_table - 1)))
+    local a = { 0 }
+    local b = { 0 }
+    local d = { 0 }
 
-    return a, b, c_table, d
-end
-
-function approx.Spline(table)
-    local C = approx.SolveCMatrix(table)
-    local a, b, c, d = get_else_coeffs(table, C)
-
-    for i = 1, #a do
-        print(a[i], b[i], c[i], d[i])
+    for i = 2, #self.func_table do
+        table.insert(a, y(i - 1))
+        table.insert(b, (y(i) - y(i - 1)) / h[i] - h[i] / 3 * (c[i + 1] + 2 * c[i]))
+        table.insert(d, (c[i + 1] - c[i]) / (3 * h[i]))
     end
+
+    self.splines.a = a
+    self.splines.b = b
+    self.splines.c = c
+    self.splines.d = d
 
     return a, b, c, d
+end
+
+function approx:At(x)
+    assert(self.splines.a ~= nil, 'splines havent been setted yet')
+
+    local near_i = self:Nearest(x)
+
+    local x_near_i = math.max(near_i - 1, 1)
+
+    return self:Cubic_poly(x - self.func_table[x_near_i].x,   self.splines.a[near_i],
+                                                              self.splines.b[near_i],
+                                                              self.splines.c[near_i],
+                                                              self.splines.d[near_i])
 end
 
 return approx
