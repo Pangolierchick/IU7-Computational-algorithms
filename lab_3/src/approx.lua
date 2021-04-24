@@ -39,7 +39,7 @@ function approx:Read_table(filename)
     for line in f:lines() do
         local row = {"x", "y"}
 
-        row.x, row.y = line:match('(%w+.%w+), (%w+.%w+)')
+        row.x, row.y = line:match('([+-]?%w+.%w+), ([+-]?%w+.%w+)')
 
         table.insert(func_table, row)
     end

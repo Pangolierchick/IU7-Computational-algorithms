@@ -23,7 +23,7 @@ local function main()
     print("Creating file", arg[1])
 
     local left  <const> = 0
-    local right <const> = 1000
+    local right <const> = 10
     local step  <const> = 1
 
     local s_time = os.clock()
